@@ -7,6 +7,7 @@ Visual identity aligned with Alexander's Personal Website (white + warm surface 
 from __future__ import annotations
 
 import html
+import math
 import streamlit as st
 
 from src.sql_queries import (
@@ -171,109 +172,148 @@ def inject_design_system_css() -> None:
             margin-top: 0.2rem;
         }
 
-        /* Game Spotlight Card (shown above the interactive table) */
-        .spotlight-card {
-            display: grid;
-            grid-template-columns: minmax(240px, 340px) 1fr;
-            gap: 1.5rem;
-            background-color: var(--color-surface);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-card);
-            padding: 1.25rem;
-            margin-bottom: 1.25rem;
-            align-items: start;
+        /* Explorer Table Header & Row Styling */
+        .table-header-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-text-muted);
+            padding: 0.35rem 0;
         }
 
-        @media (max-width: 768px) {
-            .spotlight-card {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Reserve aspect-ratio on the cover image wrapper so the page layout never
-           jumps while the Steam CDN cover image downloads. */
-        .spotlight-card__media {
+        .row-thumb {
             width: 100%;
+            max-width: 120px;
             aspect-ratio: 460 / 215;
-            background-color: var(--color-media);
-            border-radius: calc(var(--radius-card) - 6px);
-            overflow: hidden;
-            border: 1px solid var(--color-border);
-        }
-
-        .spotlight-card__media img {
-            width: 100%;
-            height: 100%;
             object-fit: cover;
+            border-radius: 6px;
+            background-color: var(--color-media);
+            border: 1px solid var(--color-border);
             display: block;
         }
 
-        .spotlight-card__header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-            margin-bottom: 0.4rem;
-        }
-
-        .spotlight-card__title {
-            font-size: 1.35rem;
-            font-weight: 700;
-            color: var(--color-text);
-            margin: 0;
-            letter-spacing: -0.02em;
-        }
-
-        .spotlight-card__meta {
-            font-size: 0.9rem;
-            color: var(--color-text-muted);
-            margin-bottom: 0.65rem;
-        }
-
-        .spotlight-card__desc {
+        .row-title {
+            font-weight: 600;
             font-size: 0.95rem;
-            color: var(--color-text-soft);
-            line-height: 1.5;
-            margin-bottom: 0.9rem;
+            color: var(--color-text);
+            line-height: 1.25;
+            margin-bottom: 0.15rem;
         }
 
-        .badge-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.45rem;
-            margin-bottom: 0.85rem;
-        }
-
-        .badge {
-            font-family: var(--font-mono);
+        .row-sub {
             font-size: 0.78rem;
-            padding: 0.2rem 0.6rem;
+            color: var(--color-text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .row-mono {
+            font-family: var(--font-mono);
+            font-size: 0.86rem;
+            color: var(--color-text-soft);
+        }
+
+        .row-score-high {
+            font-family: var(--font-mono);
+            font-size: 0.86rem;
+            font-weight: 700;
+            color: var(--color-accent);
+        }
+
+        .row-divider {
+            border: 0;
+            border-top: 1px solid var(--color-border);
+            margin: 0.35rem 0 0.45rem 0;
+        }
+
+        .pill {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.74rem;
+            padding: 0.14rem 0.5rem;
             border-radius: var(--radius-sm);
             border: 1px solid var(--color-border);
-            background-color: var(--color-bg);
+            background-color: var(--color-surface);
             color: var(--color-text-soft);
+            white-space: nowrap;
         }
 
-        .badge--accent {
+        .pill--accent {
             background-color: var(--color-accent);
             color: var(--color-accent-ink);
             border-color: var(--color-accent);
             font-weight: 500;
         }
 
-        .spotlight-stats {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1.25rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid var(--color-border);
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-            color: var(--color-text-soft);
+        .pill--muted {
+            color: var(--color-text-muted);
+            background-color: var(--color-bg);
         }
 
-        .spotlight-stats strong {
+        /* Modal detail card media & stats */
+        .modal-cover {
+            width: 100%;
+            aspect-ratio: 460 / 215;
+            background-color: var(--color-media);
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--color-border);
+            margin-bottom: 1rem;
+        }
+
+        .modal-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .modal-meta {
+            font-size: 0.9rem;
+            color: var(--color-text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .modal-desc {
+            font-size: 0.96rem;
+            color: var(--color-text-soft);
+            line-height: 1.55;
+            margin: 0.75rem 0 1rem 0;
+        }
+
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+            gap: 0.65rem;
+            margin: 1rem 0 1.25rem 0;
+        }
+
+        .modal-stat-box {
+            background-color: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 0.65rem 0.8rem;
+        }
+
+        .modal-stat-box__label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--color-text-muted);
+            margin-bottom: 0.15rem;
+        }
+
+        .modal-stat-box__val {
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            font-weight: 700;
             color: var(--color-text);
         }
 
@@ -298,6 +338,20 @@ def load_metadata() -> dict:
     return get_filter_metadata()
 
 
+def format_price_display(price_val: object, is_free: int) -> tuple[str, str]:
+    """
+    Format a game's price into (display_text, status_kind):
+      - ('Free', 'free') for confirmed Free-to-Play titles
+      - ('$19.99', 'paid') for active paid titles
+      - ('N/A', 'delisted') for delisted/replaced editions with NULL price
+    """
+    if int(is_free or 0) == 1:
+        return "Free", "free"
+    if price_val is None or (isinstance(price_val, float) and math.isnan(price_val)):
+        return "N/A", "delisted"
+    return f"${float(price_val):.2f}", "paid"
+
+
 def reset_all_filters() -> None:
     """Callback for the 'Reset Filters' button to restore default session state."""
     st.session_state["f_search"] = ""
@@ -309,6 +363,7 @@ def reset_all_filters() -> None:
     st.session_state["f_playtime"] = (0.0, 200.0)
     st.session_state["f_min_score"] = 70
     st.session_state["f_sort_by"] = "Best Rated (Wilson Score)"
+    st.session_state["last_modal_app_id"] = None
 
 
 def render_sidebar(meta: dict) -> tuple[GameFilterParams, str]:
@@ -390,9 +445,9 @@ def render_sidebar(meta: dict) -> tuple[GameFilterParams, str]:
         step=5.0,
         disabled=free_only,
         key="f_max_price",
-        help="Slide to 70 to include all price points, or lower to find budget gems.",
+        help="Slide to 70 to include all games (including delisted editions with N/A price), or lower to set a strict budget.",
     )
-    # If slider is at max (70.0), don't cap rare collector's editions priced > $70
+    # If slider is at max (70.0), don't cap rare collector's editions or hide N/A delisted games
     effective_max_price = None if max_price_slider >= 70.0 else max_price_slider
 
     # 6. Playtime & Minimum Review Score
@@ -437,7 +492,7 @@ def render_sidebar(meta: dict) -> tuple[GameFilterParams, str]:
         search_query=search_query,
     )
 
-    # Edge case: if the user explicitly deselects all 3 studio tiers, treat as no studio tier match
+    # Edge case: if the user explicitly deselects all 3 studio tiers, return 0 matches
     if len(studio_tiers) == 0:
         filters.studio_tiers = ["__NONE__"]
 
@@ -507,7 +562,7 @@ def render_header_and_kpis(kpi: dict, total_catalog: int, executed_sql: str) -> 
             <div class="kpi-card">
                 <div class="kpi-card__label">Avg Price</div>
                 <div class="kpi-card__value">{f"${avg_price:.2f}" if avg_price is not None else "—"}</div>
-                <div class="kpi-card__sub">USD store price</div>
+                <div class="kpi-card__sub">Active USD store prices</div>
             </div>
         </section>
         """,
@@ -517,17 +572,18 @@ def render_header_and_kpis(kpi: dict, total_catalog: int, executed_sql: str) -> 
     with st.expander("🔍 View Live SQL Query (Generated by Current Filters)", expanded=False):
         st.caption(
             "Every filter change executes a parameterized read-only SQLite query (`?mode=ro`). "
-            "Below is the formatted SQL query powering the current view:"
+            "Below is the formatted SQL query powering the current page:"
         )
         st.code(executed_sql, language="sql")
 
 
-def render_spotlight_card(game_row: dict) -> None:
+@st.dialog("Game Details", width="large")
+def open_game_detail_modal(game_row: dict) -> None:
     """
-    Render the 'Game Spotlight' preview card for the currently selected row in the table
-    (or the #1 top-ranked game when no row is clicked yet).
+    Modal popup triggered ONLY when a visitor clicks 'View more' on a specific game row.
+    Keeping this inside @st.dialog ensures nothing pops up on initial page load and
+    visitors never lose their scroll position when inspecting games further down the list.
     """
-    # Escape text fields so game titles or descriptions containing '<' or '&' never break HTML markup
     title = html.escape(str(game_row["name"]))
     dev = html.escape(str(game_row["developers"] or "Unknown"))
     pub = html.escape(str(game_row["publishers"] or "Unknown"))
@@ -542,75 +598,95 @@ def render_spotlight_card(game_row: dict) -> None:
     app_id = int(game_row["app_id"])
     year = int(game_row["release_year"])
 
-    price_val = float(game_row["price"])
-    price_display = "Free to Play" if price_val == 0.0 else f"${price_val:.2f}"
+    price_text, price_kind = format_price_display(game_row["price"], game_row["is_free"])
+    if price_kind == "delisted":
+        price_display = "N/A (Delisted)"
+    elif price_kind == "free":
+        price_display = "Free to Play"
+    else:
+        price_display = price_text
+
     score_pct = float(game_row["review_score_pct"])
     total_rev = int(game_row["total_reviews"])
     playtime_hrs = float(game_row["avg_playtime_hours"])
     peak_ccu = int(game_row["peak_ccu"])
     meta_val = game_row["metacritic_score"]
     meta_str = (
-        f"Metacritic: {int(meta_val)}/100"
-        if meta_val is not None and str(meta_val) != "nan"
-        else "Metacritic: —"
+        f"{int(meta_val)} / 100"
+        if meta_val is not None and not (isinstance(meta_val, float) and math.isnan(meta_val))
+        else "—"
+    )
+    hpd_val = game_row["hours_per_dollar"]
+    hpd_str = (
+        f"{float(hpd_val):.1f} hrs/$"
+        if hpd_val is not None and not (isinstance(hpd_val, float) and math.isnan(hpd_val))
+        else "—"
     )
 
     st.markdown(
         f"""
-        <article class="spotlight-card" aria-label="Selected Game Spotlight">
-            <div class="spotlight-card__media">
-                <img src="{img_url}" alt="Cover art for {title}" loading="lazy" width="460" height="215" />
+        <div class="modal-cover">
+            <img src="{img_url}" alt="Cover art for {title}" width="460" height="215" />
+        </div>
+        <h2 style="margin: 0 0 0.25rem 0;">{title} ({year})</h2>
+        <div class="modal-meta">
+            Developer: <strong>{dev}</strong> &nbsp;|&nbsp; Publisher: <strong>{pub}</strong>
+        </div>
+        <div class="badge-row">
+            <span class="pill pill--accent">Studio: {studio_tier}</span>
+            <span class="pill">{rating_tier} ({score_pct:.1f}%)</span>
+            <span class="pill">{genres_str}</span>
+            <span class="pill">{modes_str}</span>
+        </div>
+        <p class="modal-desc">{desc}</p>
+        <div class="modal-stats-grid">
+            <div class="modal-stat-box">
+                <div class="modal-stat-box__label">Price</div>
+                <div class="modal-stat-box__val">{price_display}</div>
             </div>
-            <div>
-                <div class="spotlight-card__header">
-                    <h3 class="spotlight-card__title">{title} ({year})</h3>
-                    <a class="portfolio-btn portfolio-btn--primary"
-                       href="https://store.steampowered.com/app/{app_id}"
-                       target="_blank" rel="noopener noreferrer">
-                       View on Steam ↗
-                    </a>
-                </div>
-                <div class="spotlight-card__meta">
-                    Developer: <strong>{dev}</strong> &nbsp;|&nbsp; Publisher: <strong>{pub}</strong>
-                </div>
-                <div class="badge-row">
-                    <span class="badge badge--accent">Studio: {studio_tier}</span>
-                    <span class="badge">{rating_tier} ({score_pct:.1f}%)</span>
-                    <span class="badge">{genres_str}</span>
-                    <span class="badge">{modes_str}</span>
-                </div>
-                <p class="spotlight-card__desc">{desc}</p>
-                <div class="spotlight-stats">
-                    <span>Price: <strong>{price_display}</strong></span>
-                    <span>User Reviews: <strong>{total_rev:,}</strong></span>
-                    <span>Avg Playtime: <strong>{playtime_hrs:.1f} hrs</strong></span>
-                    <span>Peak Players: <strong>{peak_ccu:,}</strong></span>
-                    <span><strong>{meta_str}</strong></span>
-                </div>
+            <div class="modal-stat-box">
+                <div class="modal-stat-box__label">User Reviews</div>
+                <div class="modal-stat-box__val">{total_rev:,}</div>
             </div>
-        </article>
+            <div class="modal-stat-box">
+                <div class="modal-stat-box__label">Avg Playtime</div>
+                <div class="modal-stat-box__val">{playtime_hrs:.1f} hrs</div>
+            </div>
+            <div class="modal-stat-box">
+                <div class="modal-stat-box__label">Peak Players</div>
+                <div class="modal-stat-box__val">{peak_ccu:,}</div>
+            </div>
+            <div class="modal-stat-box">
+                <div class="modal-stat-box__label">Metacritic</div>
+                <div class="modal-stat-box__val">{meta_str}</div>
+            </div>
+            <div class="modal-stat-box">
+                <div class="modal-stat-box__label">Value</div>
+                <div class="modal-stat-box__val">{hpd_str}</div>
+            </div>
+        </div>
+        <a class="portfolio-btn portfolio-btn--primary"
+           href="https://store.steampowered.com/app/{app_id}"
+           target="_blank" rel="noopener noreferrer">
+           Open on Steam Store ↗
+        </a>
         """,
         unsafe_allow_html=True,
     )
 
 
-def render_game_explorer_tab(filters: GameFilterParams, sort_by: str) -> None:
+def render_game_explorer_tab(
+    games_df,
+) -> None:
     """
-    Render Tab 1: 'Game Explorer' featuring:
-    1. A 'Game Spotlight' preview card (defaults to #1 result; updates when a user clicks any table row).
-    2. An interactive, sortable table with a mini cover image column (`ImageColumn`).
+    Render Tab 1: 'Game Explorer' using Streamlit's virtualized st.dataframe so:
+      - ALL matching games are smoothly scrollable (no 50-row cap)
+      - Every column header is clickable to sort ascending/descending
+      - Mini Steam cover thumbnails appear in the first column
+      - Nothing pops up on initial load; selecting any row immediately opens
+        the 'Game Details' modal (@st.dialog), and a 'View more' button appears
+        above the table to re-open the selected game anytime.
     """
-    col_info, col_limit = st.columns([3, 1])
-    with col_limit:
-        result_limit = st.selectbox(
-            "Rows to display",
-            options=[50, 100, 250, 500],
-            index=1,
-            label_visibility="collapsed",
-        )
-
-    games_df, _ = query_games_explorer(filters, sort_by=sort_by, limit=result_limit)
-
     if games_df.empty:
         st.warning(
             "No games matched your current filter combination. "
@@ -618,26 +694,48 @@ def render_game_explorer_tab(filters: GameFilterParams, sort_by: str) -> None:
         )
         return
 
-    # Read which row is currently selected in the interactive dataframe below.
-    # On initial load (before any row is clicked), we default to index 0 (the #1 top match).
-    selected_idx = 0
-    table_state = st.session_state.get("explorer_table_selection")
+    # Check if the user has selected a row in the table
+    selected_idx: int | None = None
+    table_state = st.session_state.get("explorer_table")
     if table_state and "selection" in table_state:
         rows = table_state["selection"].get("rows", [])
         if rows and 0 <= rows[0] < len(games_df):
             selected_idx = rows[0]
 
-    selected_game = games_df.iloc[selected_idx].to_dict()
+    # Top bar: row count + contextual 'View more' button when a row is selected
+    bar_left, bar_right = st.columns([3, 1.3], vertical_alignment="center")
+    if selected_idx is not None:
+        selected_game = games_df.iloc[selected_idx].to_dict()
+        selected_app_id = int(selected_game["app_id"])
+        selected_title = str(selected_game["name"])
 
-    with col_info:
-        st.markdown(
-            f"**Game Spotlight** — Showing **#{selected_idx + 1}** of top **{len(games_df)}** displayed matches "
-            "*(click any row in the table below to inspect that game)*"
-        )
+        with bar_left:
+            st.caption(
+                f"Showing all **{len(games_df):,}** matching games · "
+                f"Selected: **{selected_title}**"
+            )
+        with bar_right:
+            reopen_clicked = st.button(
+                "🔍 View more details",
+                key="reopen_selected_game_modal",
+                type="primary",
+                use_container_width=True,
+            )
 
-    render_spotlight_card(selected_game)
+        # Open the modal automatically when a NEW row is selected, or when 'View more details' is clicked.
+        # Storing last_modal_app_id prevents the modal from re-opening unexpectedly after the user closes it.
+        if reopen_clicked or st.session_state.get("last_modal_app_id") != selected_app_id:
+            st.session_state["last_modal_app_id"] = selected_app_id
+            open_game_detail_modal(selected_game)
+    else:
+        st.session_state["last_modal_app_id"] = None
+        with bar_left:
+            st.caption(
+                f"Showing all **{len(games_df):,}** matching games · "
+                "Click any column header to sort · Select any row to open full game details."
+            )
 
-    # Prepare clean table columns for st.dataframe
+    # Build table DataFrame with numeric types preserved so column-header sorting works accurately
     display_df = games_df[
         [
             "header_image",
@@ -653,19 +751,24 @@ def render_game_explorer_tab(filters: GameFilterParams, sort_by: str) -> None:
             "release_year",
         ]
     ].copy()
+    display_df["steam_url"] = (
+        "https://store.steampowered.com/app/" + games_df["app_id"].astype(str)
+    )
 
     st.dataframe(
         display_df,
-        key="explorer_table_selection",
+        key="explorer_table",
         on_select="rerun",
         selection_mode="single-row",
         use_container_width=True,
         hide_index=True,
-        height=560,
+        height=620,
+        row_height=54,
+        placeholder="—",
         column_config={
             "header_image": st.column_config.ImageColumn(
                 "Cover",
-                help="Official Steam store header image",
+                help="Official Steam store cover image",
                 width="small",
             ),
             "name": st.column_config.TextColumn(
@@ -683,14 +786,14 @@ def render_game_explorer_tab(filters: GameFilterParams, sort_by: str) -> None:
             ),
             "review_score_pct": st.column_config.ProgressColumn(
                 "User Score",
-                help="Percentage of positive user reviews on Steam",
+                help="Percentage of positive Steam user reviews",
                 format="%.1f%%",
                 min_value=0,
                 max_value=100,
             ),
             "metacritic_score": st.column_config.NumberColumn(
                 "Metacritic",
-                help="Critic score out of 100 (blank if not reviewed on Metacritic)",
+                help="Critic score out of 100 (— if no Metacritic score)",
                 format="%d",
             ),
             "avg_playtime_hours": st.column_config.NumberColumn(
@@ -700,6 +803,7 @@ def render_game_explorer_tab(filters: GameFilterParams, sort_by: str) -> None:
             ),
             "price": st.column_config.NumberColumn(
                 "Price",
+                help="$0.00 = Free to Play · — = Delisted / Unavailable on Steam",
                 format="$%.2f",
             ),
             "total_reviews": st.column_config.NumberColumn(
@@ -715,6 +819,11 @@ def render_game_explorer_tab(filters: GameFilterParams, sort_by: str) -> None:
                 "Year",
                 format="%d",
             ),
+            "steam_url": st.column_config.LinkColumn(
+                "Steam",
+                display_text="Store ↗",
+                width="small",
+            ),
         },
     )
 
@@ -725,8 +834,9 @@ def main() -> None:
     filters, sort_by = render_sidebar(meta)
 
     kpi, _ = query_kpi_summary(filters)
-    _, explorer_sql = query_games_explorer(filters, sort_by=sort_by, limit=100)
-    render_header_and_kpis(kpi, meta["total_games"], explorer_sql)
+    games_df, executed_sql = query_games_explorer(filters, sort_by=sort_by, limit=None)
+
+    render_header_and_kpis(kpi, meta["total_games"], executed_sql)
 
     tab_explorer, tab_scatter, tab_landscape = st.tabs(
         [
@@ -737,7 +847,7 @@ def main() -> None:
     )
 
     with tab_explorer:
-        render_game_explorer_tab(filters, sort_by)
+        render_game_explorer_tab(games_df)
 
     with tab_scatter:
         st.info(

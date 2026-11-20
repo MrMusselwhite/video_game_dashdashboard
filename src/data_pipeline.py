@@ -5,6 +5,7 @@ Transforms raw Steam parquet metadata into a normalized SQLite database (data/st
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from pathlib import Path
@@ -215,6 +216,66 @@ def classify_studio_tier(
     return "Indie"
 
 
+def resolve_price_and_free_flag(
+    raw_price: float,
+    raw_genres: Iterable[str] | None,
+    raw_packages: str | None,
+) -> tuple[float | None, int]:
+    """
+    Distinguish genuinely Free-to-Play games from delisted/replaced paid games whose
+    Steam API price defaulted to 0.0 during scraping.
+
+    Returns (cleaned_price_or_None, is_free_flag):
+      - Paid games (> $0): (price, 0)
+      - Tagged 'Free To Play': (0.0, 1)
+      - $0.00 without 'Free To Play' tag:
+          1) Recover lowest paid price from packages JSON if available.
+          2) If a package explicitly says 'Free' (e.g. Artifact), mark (0.0, 1).
+          3) Otherwise treat as delisted/unavailable: (None, 0) so SQL AVG(price)
+             and 'Free-to-Play Only' filters stay accurate.
+    """
+    price_val = float(raw_price) if pd.notna(raw_price) else 0.0
+    if price_val > 0.0:
+        return round(price_val, 2), 0
+
+    has_f2p_genre = (
+        any(str(g).strip() == "Free To Play" for g in raw_genres)
+        if raw_genres is not None and hasattr(raw_genres, "__iter__")
+        else False
+    )
+    if has_f2p_genre:
+        return 0.0, 1
+
+    if isinstance(raw_packages, str) and len(raw_packages) > 2:
+        try:
+            pkgs = json.loads(raw_packages)
+            paid_prices: list[float] = []
+            has_explicit_free_sub = False
+            for pkg in pkgs:
+                for sub in pkg.get("subs", []):
+                    sub_price = sub.get("price")
+                    sub_text = str(sub.get("text", ""))
+                    if isinstance(sub_price, (int, float)) and sub_price > 0:
+                        paid_prices.append(float(sub_price))
+                    elif (
+                        "free" in sub_text.lower()
+                        and not any(
+                            excl in sub_text.lower()
+                            for excl in ("ea play", "ubisoft+", "subscription", "trial", "demo", "episode 1")
+                        )
+                        and (sub_price == 0 or sub_price == 0.0)
+                    ):
+                        has_explicit_free_sub = True
+            if paid_prices:
+                return round(min(paid_prices), 2), 0
+            if has_explicit_free_sub:
+                return 0.0, 1
+        except (ValueError, TypeError):
+            pass
+
+    return None, 0
+
+
 def join_array_field(val: Iterable[str] | None, max_items: int = 3) -> str:
     """Convert numpy array / list of strings into a comma-separated string."""
     if val is None or not hasattr(val, "__iter__"):
@@ -244,7 +305,7 @@ def run_pipeline(
     non_game_title_mask = df["name"].str.contains(
         r"\b(?:Playtest|Demo|Soundtrack|OST|Dedicated Server|SDK|Benchmark|Artbook|Beta Test|"
         r"Wallpaper Engine|Soundpad|Lossless Scaling|Crosshair X|VTube Studio|3DMark|"
-        r"Borderless Gaming|OVR Toolkit|Virtual Desktop|RPG Maker|Aseprite|Blender)\b",
+        r"Borderless Gaming|OVR Toolkit|Virtual Desktop|RPG Maker|Aseprite|Blender|Source Filmmaker)\b",
         case=False,
         regex=True,
         na=True,
@@ -308,8 +369,12 @@ def run_pipeline(
     filtered["release_year"] = parsed_dates.dt.year.fillna(0).astype(int)
     filtered = filtered[(filtered["release_year"] >= 1995) & (filtered["release_year"] <= 2026)].copy()
 
-    filtered["price"] = filtered["price"].fillna(0.0).astype(float).round(2)
-    filtered["is_free"] = (filtered["price"] == 0.0).astype(int)
+    resolved_prices = [
+        resolve_price_and_free_flag(p, g, pkg)
+        for p, g, pkg in zip(filtered["price"], filtered["genres"], filtered["packages"])
+    ]
+    filtered["price"] = [rp[0] for rp in resolved_prices]
+    filtered["is_free"] = [rp[1] for rp in resolved_prices]
 
     filtered["review_score_pct"] = (
         (filtered["positive"] / filtered["total_reviews"]) * 100.0
@@ -337,12 +402,11 @@ def run_pipeline(
     ).round(1)
     filtered["playtime_tier"] = filtered["avg_playtime_hours"].apply(classify_playtime_tier)
 
-    # Value metric: hours of average playtime per dollar (for paid games >= $1)
-    filtered["hours_per_dollar"] = np.where(
-        filtered["price"] >= 1.0,
-        np.round(filtered["avg_playtime_hours"] / filtered["price"], 2),
-        None,
-    )
+    # Value metric: hours of average playtime per dollar (for paid games >= $1 with known price)
+    filtered["hours_per_dollar"] = [
+        round(hrs / prc, 2) if (prc is not None and pd.notna(prc) and prc >= 1.0) else None
+        for hrs, prc in zip(filtered["avg_playtime_hours"], filtered["price"])
+    ]
 
     # Owners & Popularity
     filtered["estimated_owners_label"] = filtered["estimated_owners"].fillna("Unknown").astype(str)
@@ -356,7 +420,7 @@ def run_pipeline(
         lambda g: "Indie" in g if hasattr(g, "__iter__") else False
     )
     filtered["studio_tier"] = [
-        classify_studio_tier(indie_tag, dev, pub, prc, rev)
+        classify_studio_tier(indie_tag, dev, pub, float(prc) if (prc is not None and pd.notna(prc)) else 0.0, rev)
         for indie_tag, dev, pub, prc, rev in zip(
             filtered["has_raw_indie_tag"],
             filtered["developers_str"],
@@ -484,7 +548,7 @@ def run_pipeline(
                 release_year INTEGER,
                 studio_tier TEXT NOT NULL,
                 is_indie INTEGER NOT NULL,
-                price REAL NOT NULL,
+                price REAL,
                 is_free INTEGER NOT NULL,
                 positive INTEGER NOT NULL,
                 negative INTEGER NOT NULL,

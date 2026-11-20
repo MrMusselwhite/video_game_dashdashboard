@@ -25,7 +25,7 @@ SORT_COLUMNS: dict[str, str] = {
     "Longest Playtime (Hours)": "g.avg_playtime_hours DESC, g.wilson_score DESC",
     "Best Value (Hours per $)": "COALESCE(g.hours_per_dollar, -1) DESC, g.wilson_score DESC",
     "Newest Releases": "g.release_year DESC, g.release_date DESC, g.wilson_score DESC",
-    "Price: Low to High": "g.price ASC, g.wilson_score DESC",
+    "Price: Low to High": "CASE WHEN g.price IS NULL THEN 1 ELSE 0 END ASC, g.price ASC, g.wilson_score DESC",
 }
 
 
@@ -118,7 +118,7 @@ def build_where_clause(filters: GameFilterParams) -> tuple[str, list[Any]]:
         clauses.append("g.is_free = ?")
         params.append(1)
     elif filters.max_price is not None:
-        clauses.append("g.price <= ?")
+        clauses.append("(g.price IS NOT NULL AND g.price <= ?)")
         params.append(float(filters.max_price))
 
     # 5. Playtime hours & Playtime Tier filters
@@ -244,16 +244,24 @@ WHERE {where_sql};
 def query_games_explorer(
     filters: GameFilterParams,
     sort_by: str = "Best Rated (Wilson Score)",
-    limit: int = 60,
+    limit: int | None = None,
+    offset: int = 0,
     db_path: Path = SQLITE_DB_PATH,
 ) -> tuple[pd.DataFrame, str]:
     """
     Execute SQL query for Feature 1 ('Find My Next Game' Visual Explorer)
     and Feature 2 (Value vs. Reception Scatter Plot).
+    When limit is None, returns all matching games so st.dataframe can scroll
+    and sort across the entire filtered result set without an artificial cap.
     """
     where_sql, params = build_where_clause(filters)
     order_clause = SORT_COLUMNS.get(sort_by, SORT_COLUMNS["Best Rated (Wilson Score)"])
-    query_params = [*params, int(limit)]
+    query_params = list(params)
+
+    limit_clause = ""
+    if limit is not None:
+        limit_clause = "\nLIMIT ? OFFSET ?"
+        query_params.extend([int(limit), int(offset)])
 
     sql = f"""
 SELECT
@@ -285,8 +293,7 @@ SELECT
     g.header_image
 FROM games g
 WHERE {where_sql}
-ORDER BY {order_clause}
-LIMIT ?;
+ORDER BY {order_clause}{limit_clause};
 """.strip()
 
     with get_readonly_connection(db_path) as conn:
